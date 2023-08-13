@@ -1,9 +1,10 @@
 ﻿using BG3ModPackager;
 using CommandLine;
 using System.Diagnostics;
+using System.Text.Json;
+using System.Xml.Serialization;
 
 const string DivinePath = @"C:\Users\Lia\Desktop\BG3\ExportTool-v1.18.2\Tools\divine.exe";
-
 Parser.Default.ParseArguments<BuildOptions>(args).WithParsed(RunBuildAndPack);
 
 static void RunBuildAndPack(BuildOptions opts)
@@ -28,64 +29,89 @@ static void RunBuildAndPack(BuildOptions opts)
     List<string> files = Directory.EnumerateFiles(sourceDir, "*", SearchOption.AllDirectories).ToList();
     foreach (string filePath in files)
     {
-        string relativePath = GetRelativePath(sourceDir, filePath);
-        string destFilePath = Path.Combine(targetDir, relativePath);
-        string destDir = Path.GetDirectoryName(destFilePath)!;
-        Directory.CreateDirectory(destDir);
+        string destFilePath = Path.Combine(targetDir, GetRelativePath(sourceDir, filePath));
+        Directory.CreateDirectory(Path.GetDirectoryName(destFilePath)!);
 
         Log($"Building {filePath}", ConsoleColor.Cyan);
 
-        string name = Path.GetFileNameWithoutExtension(filePath);
-        string extension = Path.GetExtension(destFilePath);
+        string fileName = Path.GetFileNameWithoutExtension(filePath);
+        string fileExt = Path.GetExtension(destFilePath);
 
-        if (extension == ".lsx")
+        if (fileExt == ".json")
+        {
+            string fileContents = File.ReadAllText(filePath);
+            AssetJson asset = JsonSerializer.Deserialize<AssetJson>(fileContents)!;
+
+            if (asset.Type == AssetJsonType.TextureAtlas)
+            {
+                TextureAtlasJson atlasJson = JsonSerializer.Deserialize<TextureAtlasJson>(fileContents)!;
+                TextureAtlasLsx atlasLsx = TextureAtlasLsx.Create(atlasJson);
+
+                string lsfDirectory = Path.Combine(targetDir, atlasJson.AtlasBasePath, atlasJson.AtlasLsfPath);
+                string lsxPath = Path.Combine(lsfDirectory, $"{fileName}.lsx");
+                string lsfPath = Path.ChangeExtension(lsxPath, ".lsf");
+
+                Directory.CreateDirectory(lsfDirectory);
+
+                XmlSerializer serializer = new(typeof(TextureAtlasLsx));
+                using (StreamWriter writer = new(lsxPath))
+                {
+                    serializer.Serialize(writer, atlasLsx);
+                }
+
+                Build(lsxPath, lsfPath);
+                Log($"Created .lsx/.lsf pair from {fileName}");
+
+                using Image<Rgba32> atlasImage = TextureAtlasBuilder.CreateAtlasFromXml(lsxPath, files);
+                string tempFilePath = Path.ChangeExtension(Path.GetTempFileName(), ".png");
+                atlasImage.Save(tempFilePath);
+                string destPathAtlas = Path.Combine(targetDir, atlasJson.AtlasBasePath, atlasJson.AtlasDdsPath);
+                ConvertToDdsBc3(tempFilePath, destPathAtlas);
+                File.Delete(tempFilePath);
+                Log($"Created atlas {fileName}");
+
+                continue;
+            }
+            else
+            {
+                Log($"Unknown asset type {asset.Type}", ConsoleColor.Red);
+            }
+        }
+
+        if (fileExt == ".lsx")
         {
             File.Copy(filePath, destFilePath);
             string destPath = Path.ChangeExtension(destFilePath, ".lsf");
             Build(filePath, destPath);
             Log($"Compiled {destPath}\n  Including source at {destFilePath}");
-
-            if (name.Contains("Atlas"))
-            {
-                using TextureAtlas atlas = TextureAtlasBuilder.CreateAtlasFromXml(filePath, files);
-                string tempFilePath = Path.ChangeExtension(Path.GetTempFileName(), ".png");
-                atlas.Image.Save(tempFilePath);
-
-                string destPathAtlas = Path.Combine(targetDir, "Public", "DyeDyeDye", atlas.DesiredRelativePath);
-                ConvertToDdsBc3(tempFilePath, destPathAtlas);
-                File.Delete(tempFilePath);
-
-                Log($"Generated atlas {destPathAtlas}");
-            }
-
             continue;
         }
 
-        if (extension == ".xml" && filePath.Contains("Localization"))
+        if (fileExt == ".xml" && filePath.Contains("Localization"))
         {
             File.Copy(filePath, destFilePath);
             string destPath = Path.ChangeExtension(destFilePath, ".loca");
             LocaResource.ReadFromXml(filePath).SaveTo(destPath);
-            Log($"Compiled localization table {name} -> {destPath}  Including source at {destFilePath}");
+            Log($"Compiled localization table {fileName} -> {destPath}  Including source at {destFilePath}");
             continue;
         }
 
-        if (extension == ".png")
+        if (fileExt == ".png")
         {
             string destPath = Path.ChangeExtension(destFilePath, ".DDS");
             ConvertToDdsBc3(filePath, destPath);
-            Log($"Converted {name} -> {destPath}");
+            Log($"Converted {fileName} -> {destPath}");
             continue;
         }
 
-        if (extension == ".xml" || extension == ".txt")
+        if (fileExt == ".xml" || fileExt == ".txt")
         {
             File.Copy(filePath, destFilePath);
             Log($"Included {destFilePath}");
             continue;
         }
 
-        Log($"Warning: Skipped file {name}", ConsoleColor.Yellow);
+        Log($"Warning: Skipped file {fileName}", ConsoleColor.Yellow);
     }
 
     string packagePath = $"{sourceDir}.pak";
@@ -118,7 +144,7 @@ static void Package(string sourceDir, string targetFile) =>
 static void ConvertToDdsBc3(string inputFilePath, string outputFilePath)
 {
     string scratchPath = Path.GetDirectoryName(Path.GetTempPath())!;
-    InvokeProcess("texconv.exe", $"-m 1 -f BC3_UNORM_SRGB \"{inputFilePath}\" -o \"{scratchPath}\" -y");
+    InvokeProcess("texconv.exe", $"-m 1 -f BC3_UNORM \"{inputFilePath}\" -o \"{scratchPath}\" -y");
 
     string inputFileName = Path.GetFileName(inputFilePath);
     string scratchFilePath = Path.Combine(scratchPath, Path.ChangeExtension(inputFileName, ".dds"));

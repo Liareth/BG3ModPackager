@@ -2,17 +2,9 @@
 
 namespace BG3ModPackager;
 
-public record TextureAtlas(Image<Rgba32> Image, string DesiredRelativePath) : IDisposable
-{
-    public void Dispose()
-    {
-        Image.Dispose();
-    }
-}
-
 public class TextureAtlasBuilder
 {
-    public static TextureAtlas CreateAtlasFromXml(string xmlPath, IEnumerable<string> rootFiles)
+    public static Image<Rgba32> CreateAtlasFromXml(string xmlPath, IEnumerable<string> rootFiles)
     {
         XDocument document = XDocument.Parse(File.ReadAllText(xmlPath));
 
@@ -55,22 +47,42 @@ public class TextureAtlasBuilder
                     icon.Mutate(ctx => ctx.Resize((int)width, (int)height));
                 }
 
-                for (int i = 0; i < icon.Width; i++)
-                {
-                    for (int j = 0; j < icon.Height; j++)
-                    {
-                        Rgba32 pixel = icon[i, j];
-                        pixel.A = (byte)Math.Clamp(pixel.A * 1.5, 0, 255);
-                        icon[i, j] = pixel;
-                    }
-                }
+                ApplyAlphaAdjustment(icon);
 
-                atlas.Mutate(ctx => ctx.DrawImage(icon, new Point((int)x, (int)y), 1f));
+                atlas.Mutate(ctx => ctx.DrawImage(icon, new Point((int)x, (int)y), 1.0f));
             }
-
         }
 
-        string relativePath = document.Descendants("node").First(n => n.Attribute("id")!.Value == "TextureAtlasPath").Elements("attribute").First(a => a.Attribute("id")!.Value == "Path").Attribute("value")!.Value;
-        return new(atlas, relativePath);
+        return atlas;
+    }
+
+    // * Stretch alpha non-linearly such that the almost invisible parts become much more visible
+    // * Normalize such that our lowest alpha should be 255.
+    private static void ApplyAlphaAdjustment(Image<Rgba32> icon)
+    {
+        byte maxAlpha = 0;
+
+        for (int i = 0; i < icon.Width; i++)
+        {
+            for (int j = 0; j < icon.Height; j++)
+            {
+                Rgba32 pixel = icon[i, j];
+                byte denorm = (byte)Math.Clamp(Math.Pow(pixel.A / 255.0, 0.5) * 255, 0, 255);
+                maxAlpha = Math.Max(maxAlpha, denorm);
+                icon[i, j] = pixel with { A = denorm };
+            }
+        }
+
+        double alphaScale = maxAlpha / 255.0 + 0.5;
+
+        for (int i = 0; i < icon.Width; i++)
+        {
+            for (int j = 0; j < icon.Height; j++)
+            {
+                Rgba32 pixel = icon[i, j];
+                byte denorm = (byte)Math.Clamp(pixel.A * alphaScale, 0, 255);
+                icon[i, j] = pixel with { A = denorm };
+            }
+        }
     }
 }
