@@ -66,7 +66,7 @@ static void RunBuildAndPack(BuildOptions opts)
                 string tempFilePath = Path.ChangeExtension(Path.GetTempFileName(), ".png");
                 atlasImage.Save(tempFilePath);
                 string destPathAtlas = Path.Combine(targetDir, atlasJson.AtlasBasePath, atlasJson.AtlasDdsPath);
-                ConvertToDdsBc3(tempFilePath, destPathAtlas);
+                ConvertToDds(tempFilePath, destPathAtlas, DdsType.Bc3);
                 File.Delete(tempFilePath);
                 Log($"Created atlas {fileName}");
 
@@ -99,7 +99,7 @@ static void RunBuildAndPack(BuildOptions opts)
         if (fileExt == ".png")
         {
             string destPath = Path.ChangeExtension(destFilePath, ".DDS");
-            ConvertToDdsBc3(filePath, destPath);
+            ConvertToDds(filePath, destPath, DdsType.Bc7);
             Log($"Converted {fileName} -> {destPath}");
             continue;
         }
@@ -141,10 +141,17 @@ static void Build(string sourceFile, string destinationFile) =>
 static void Package(string sourceDir, string targetFile) =>
     InvokeProcess(DivinePath, $"--game bg3 --compression-method none --action create-package --source \"{sourceDir}\" --destination \"{targetFile}\"");
 
-static void ConvertToDdsBc3(string inputFilePath, string outputFilePath)
+static void ConvertToDds(string inputFilePath, string outputFilePath, DdsType ddsType)
 {
+    string ddsTypeString = ddsType switch
+    {
+        DdsType.Bc3 => "BC3_UNORM",
+        DdsType.Bc7 => "BC7_UNORM_SRGB",
+        _ => throw new NotImplementedException()
+    };
+
     string scratchPath = Path.GetDirectoryName(Path.GetTempPath())!;
-    InvokeProcess("texconv.exe", $"-m 1 -f BC3_UNORM \"{inputFilePath}\" -o \"{scratchPath}\" -y");
+    InvokeProcess("texconv.exe", $"-m 1 -f {ddsTypeString} \"{inputFilePath}\" -o \"{scratchPath}\" -y");
 
     string inputFileName = Path.GetFileName(inputFilePath);
     string scratchFilePath = Path.Combine(scratchPath, Path.ChangeExtension(inputFileName, ".dds"));
@@ -194,3 +201,9 @@ class BuildOptions
     [Option("deploy", Required = false, HelpText = "Deploy updated package locally.")]
     public string? DeployPath { get; set; } = null;
 }
+
+enum DdsType
+{
+    Bc3,
+    Bc7
+};
