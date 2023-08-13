@@ -87,6 +87,7 @@ void BuildSingleDirectory(
         string fileExt = Path.GetExtension(destFilePath);
 
         string filePathRelative = Path.GetRelativePath(sourceDir, filePath).Replace('\\', '/');
+
         if (replacementFiles.ContainsKey(filePathRelative))
         {
             filePath = Path.Combine(Path.GetTempPath(), filePathRelative);
@@ -143,7 +144,6 @@ void BuildSingleDirectory(
                 Log($"Unknown asset type {asset.Type}", ConsoleColor.Red);
             }
         }
-
         else if (fileExt == ".lsx")
         {
             File.Copy(filePath, destFilePath);
@@ -181,6 +181,7 @@ void BuildSingleDirectory(
         }
     }
 }
+
 void Build(string sourceFile, string destinationFile) =>
     InvokeProcess(_divinePath, $"--game bg3 --action convert-resource --source \"{sourceFile}\" --destination \"{destinationFile}\"");
 
@@ -258,7 +259,7 @@ static string GetFullPath(string file)
 
     foreach (string dir in path.Split(Path.PathSeparator))
     {
-        string? filePath = Path.Combine(dir, file);
+        string filePath = Path.Combine(dir, file);
         if (File.Exists(filePath))
         {
             return filePath;
