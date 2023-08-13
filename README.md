@@ -1,17 +1,16 @@
-Build, then invoke the .exe like: BG3ModPackager.exe [path_to_input_folder] [path_to_output_folder] --deploy [path_to_deploy_folder], where --deploy is optional.
-
-Given an unpackaged mod, this code does:
+Given an unpackaged mod, this tool:
 
 * Converts png to dds (must have texconv.exe from DirectX toolkit on PATH)
-* Constructs a texture atlas from any lsx which has "Atlas" in its name
 * Builds .loca from .xml (credit to lsutils from which I adapted the code)
 * Builds .lsf from .lsx
+* Constructs texture atlases based on .json descriptions
+* Constructs mod variations based on .json descriptions
 * Packages into .pak
 * Optionally deploys .pak
+* Creates .zip from .pak
 
-READ BEFORE USING:
+**You need to make sure you have divine.exe (lslib) and texconv.exe (DirectX SDK, or wheverer) on your PATH.**. Invoke like: `BG3ModPackager.exe [path_to_input_folder] --deploy [path_to_deploy_folder], where --deploy is optional.`
 
-* You need to unhardcode the divine.exe path from the code.
-* You need to unhardcode the DyeDyeDye reference in the code.
+See https://github.com/Liareth/BG3Mods for an example of mods that use it.
 
-This is a bit of a code dump, so don't expect much support. Ta ta
+This is a bit of a code dump - it mostly exists to make my life easier - so don't expect much support. Ta ta!

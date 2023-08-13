@@ -5,10 +5,14 @@ using System.IO.Compression;
 using System.Text.Json;
 using System.Xml.Serialization;
 
-const string DivinePath = @"C:\Users\Lia\Desktop\BG3\ExportTool-v1.18.2\Tools\divine.exe";
+string _divinePath = GetFullPath("divine.exe");
+string _texConvPath = GetFullPath("texconv.exe");
+
+Log($"Divine path: {_divinePath}\nTexconv path: {_texConvPath}");
+
 Parser.Default.ParseArguments<BuildOptions>(args).WithParsed(RunBuildAndPack);
 
-static void RunBuildAndPack(BuildOptions opts)
+void RunBuildAndPack(BuildOptions opts)
 {
     string sourceDir = opts.SourceDir;
     string modName = Path.GetFileName(sourceDir);
@@ -50,7 +54,7 @@ static void RunBuildAndPack(BuildOptions opts)
     }
 }
 
-static void BuildSingleDirectory(
+void BuildSingleDirectory(
     string sourceDir,
     string targetDir,
     Dictionary<string, string> replacementFiles)
@@ -177,56 +181,13 @@ static void BuildSingleDirectory(
         }
     }
 }
+void Build(string sourceFile, string destinationFile) =>
+    InvokeProcess(_divinePath, $"--game bg3 --action convert-resource --source \"{sourceFile}\" --destination \"{destinationFile}\"");
 
-static void CopyDirectory(string sourceDirName, string destDirName)
-{
-    Directory.CreateDirectory(destDirName);
+void Package(string sourceDir, string destinationFile) =>
+    InvokeProcess(_divinePath, $"--game bg3 --compression-method none --action create-package --source \"{sourceDir}\" --destination \"{destinationFile}\"");
 
-    foreach (string file in Directory.GetFiles(sourceDirName))
-    {
-        string destFile = Path.Combine(destDirName, Path.GetFileName(file));
-        File.Copy(file, destFile, true);
-    }
-
-    foreach (string dir in Directory.GetDirectories(sourceDirName))
-    {
-        string destDir = Path.Combine(destDirName, Path.GetFileName(dir));
-        CopyDirectory(dir, destDir);
-    }
-}
-
-static string GetRelativePath(string sourceDir, string filePath)
-{
-    Uri file = new(filePath);
-    Uri folder = new(sourceDir.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar);
-    Uri relativePath = folder.MakeRelativeUri(file);
-    return Uri.UnescapeDataString(relativePath.ToString().Replace('/', Path.DirectorySeparatorChar));
-}
-
-static Dictionary<string, string> GetModifiedFiles(string sourceDir, BuildVariantJsonEntry entry)
-{
-    Dictionary<string, string> map = new();
-
-    foreach (BuildVariantJsonOperationFindReplace operation in entry.Operations ?? Enumerable.Empty<BuildVariantJsonOperationFindReplace>())
-    {
-        if (!map.ContainsKey(operation.Path))
-        {
-            map[operation.Path] = File.ReadAllText(Path.Combine(sourceDir, operation.Path));
-        }
-
-        map[operation.Path] = map[operation.Path].Replace(operation.Find, operation.Replace);
-    }
-
-    return map;
-}
-
-static void Build(string sourceFile, string destinationFile) =>
-    InvokeProcess(DivinePath, $"--game bg3 --action convert-resource --source \"{sourceFile}\" --destination \"{destinationFile}\"");
-
-static void Package(string sourceDir, string destinationFile) =>
-    InvokeProcess(DivinePath, $"--game bg3 --compression-method none --action create-package --source \"{sourceDir}\" --destination \"{destinationFile}\"");
-
-static void ConvertToDds(string inputFilePath, string outputFilePath, DdsType ddsType)
+void ConvertToDds(string inputFilePath, string outputFilePath, DdsType ddsType)
 {
     string ddsTypeString = ddsType switch
     {
@@ -236,7 +197,7 @@ static void ConvertToDds(string inputFilePath, string outputFilePath, DdsType dd
     };
 
     string scratchPath = Path.GetDirectoryName(Path.GetTempPath())!;
-    InvokeProcess("texconv.exe", $"-m 1 -f {ddsTypeString} \"{inputFilePath}\" -o \"{scratchPath}\" -y");
+    InvokeProcess(_texConvPath, $"-m 1 -f {ddsTypeString} \"{inputFilePath}\" -o \"{scratchPath}\" -y");
 
     string inputFileName = Path.GetFileName(inputFilePath);
     string scratchFilePath = Path.Combine(scratchPath, Path.ChangeExtension(inputFileName, ".dds"));
@@ -264,6 +225,64 @@ static void InvokeProcess(string fileName, string arguments)
     string processPrefix = $"{Path.GetFileName(fileName)}: ";
     string output = process.StandardOutput.ReadToEnd().Replace("\n", $"\n{processPrefix}");
     Log($"{processPrefix}{output}", col);
+}
+
+static void CopyDirectory(string sourceDirName, string destDirName)
+{
+    Directory.CreateDirectory(destDirName);
+
+    foreach (string file in Directory.GetFiles(sourceDirName))
+    {
+        string destFile = Path.Combine(destDirName, Path.GetFileName(file));
+        File.Copy(file, destFile, true);
+    }
+
+    foreach (string dir in Directory.GetDirectories(sourceDirName))
+    {
+        string destDir = Path.Combine(destDirName, Path.GetFileName(dir));
+        CopyDirectory(dir, destDir);
+    }
+}
+
+static string GetRelativePath(string sourceDir, string filePath)
+{
+    Uri file = new(filePath);
+    Uri folder = new(sourceDir.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar);
+    Uri relativePath = folder.MakeRelativeUri(file);
+    return Uri.UnescapeDataString(relativePath.ToString().Replace('/', Path.DirectorySeparatorChar));
+}
+
+static string GetFullPath(string file)
+{
+    string path = Environment.GetEnvironmentVariable("PATH")!;
+
+    foreach (string dir in path.Split(Path.PathSeparator))
+    {
+        string? filePath = Path.Combine(dir, file);
+        if (File.Exists(filePath))
+        {
+            return filePath;
+        }
+    }
+
+    return string.Empty;
+}
+
+static Dictionary<string, string> GetModifiedFiles(string sourceDir, BuildVariantJsonEntry entry)
+{
+    Dictionary<string, string> map = new();
+
+    foreach (BuildVariantJsonOperationFindReplace operation in entry.Operations ?? Enumerable.Empty<BuildVariantJsonOperationFindReplace>())
+    {
+        if (!map.ContainsKey(operation.Path))
+        {
+            map[operation.Path] = File.ReadAllText(Path.Combine(sourceDir, operation.Path));
+        }
+
+        map[operation.Path] = map[operation.Path].Replace(operation.Find, operation.Replace);
+    }
+
+    return map;
 }
 
 static void Log(string message, ConsoleColor color = ConsoleColor.Gray)
