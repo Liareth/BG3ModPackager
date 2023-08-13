@@ -3,6 +3,7 @@
 public enum AssetJsonType
 {
     TextureAtlas = 0,
+    BuildVariant = 1,
 }
 
 public record AssetJson(
@@ -17,3 +18,23 @@ public record TextureAtlasJson(
     int IconSize,
     List<string> ImageKeys)
     : AssetJson(Type);
+
+public enum BuildVariantOperationType
+{
+    FindReplace = 0
+}
+
+public record BuildVariantJson(
+    AssetJsonType Type,
+    List<BuildVariantJsonEntry> Entries);
+
+// TODO: Fix when support more op types
+public record BuildVariantJsonEntry(
+    string? Name,
+    List<BuildVariantJsonOperationFindReplace>? Operations);
+
+public record BuildVariantJsonOperationFindReplace(
+    BuildVariantOperationType Type,
+    string Path,
+    string Find,
+    string Replace);

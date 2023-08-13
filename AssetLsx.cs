@@ -124,7 +124,7 @@ public record TextureAtlasLsxNode
     public required string Id { get; init; }
 
     [XmlElement("children")]
-    public TextureAtlasLsxNodesWrapper Children { get; init; }
+    public TextureAtlasLsxNodesWrapper Children { get; init; } = new();
 
     [XmlElement("attribute")]
     public List<TextureAtlasLsxAttribute> Attributes { get; init; } = new();

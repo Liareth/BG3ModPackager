@@ -2,7 +2,7 @@
   "profiles": {
     "BG3ModPackager": {
       "commandName": "Project",
-      "commandLineArgs": "\"C:\\Users\\Lia\\Desktop\\BG3\\DyeDyeDye\" \"C:\\Users\\Lia\\Desktop\\BG3\\DyeDyeDye_Build\" --deploy \"C:\\Users\\Lia\\AppData\\Local\\Larian Studios\\Baldur's Gate 3\\Mods\\DyeDyeDye.pak\""
+      "commandLineArgs": "\"C:/Users/Lia/Desktop/BG3/MyMods/DyeDyeDye\" --deploy \"C:/Users/Lia/AppData/Local/Larian Studios/Baldur's Gate 3/Mods\""
     }
   }
 }

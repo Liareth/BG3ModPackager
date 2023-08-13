@@ -1,34 +1,33 @@
-﻿using System.Xml.Linq;
-
-namespace BG3ModPackager;
+﻿namespace BG3ModPackager;
 
 public class TextureAtlasBuilder
 {
-    public static Image<Rgba32> CreateAtlasFromXml(string xmlPath, IEnumerable<string> rootFiles)
+    public static Image<Rgba32> CreateAtlasFromXml(TextureAtlasLsx xml, IEnumerable<string> rootFiles)
     {
-        XDocument document = XDocument.Parse(File.ReadAllText(xmlPath));
+        TextureAtlasLsxRegion textureAtlasInfo = xml.Regions[0];
+        TextureAtlasLsxRegion iconUvList = xml.Regions[1];
 
         // sorry christ for the whatever the heck this is
-        int iconHeight = int.Parse(document.Descendants("node").First(n => n.Attribute("id")!.Value == "TextureAtlasIconSize").Element("attribute")!.Attribute("value")!.Value);
-        int iconWidth = int.Parse(document.Descendants("node").First(n => n.Attribute("id")!.Value == "TextureAtlasIconSize").Elements("attribute").First(a => a.Attribute("id")!.Value == "Width").Attribute("value")!.Value);
-        int atlasHeight = int.Parse(document.Descendants("node").First(n => n.Attribute("id")!.Value == "TextureAtlasTextureSize").Element("attribute")!.Attribute("value")!.Value);
-        int atlasWidth = int.Parse(document.Descendants("node").First(n => n.Attribute("id")!.Value == "TextureAtlasTextureSize").Elements("attribute").First(a => a.Attribute("id")!.Value == "Width").Attribute("value")!.Value);
+        int iconHeight = int.Parse(textureAtlasInfo.RootNode.Children.Nodes[0].Attributes[0].Value);
+        int iconWidth = int.Parse(textureAtlasInfo.RootNode.Children.Nodes[0].Attributes[1].Value);
+        int atlasHeight = int.Parse(textureAtlasInfo.RootNode.Children.Nodes[2].Attributes[0].Value);
+        int atlasWidth = int.Parse(textureAtlasInfo.RootNode.Children.Nodes[2].Attributes[1].Value);
 
         Image<Rgba32> atlas = new(atlasWidth, atlasHeight);
 
-        foreach (XElement iconNode in document.Descendants("node").Where(n => n.Attribute("id")!.Value == "IconUV"))
+        foreach (TextureAtlasLsxNode iconUv in iconUvList.RootNode.Children.Nodes)
         {
-            string key = iconNode.Elements("attribute").First(a => a.Attribute("id")!.Value == "MapKey").Attribute("value")!.Value;
+            string key = iconUv.Attributes[0].Value;
             string? iconPath = rootFiles
                 .Select(x => Path.ChangeExtension(x, null))
                 .FirstOrDefault(x => x.EndsWith(key));
 
             if (!string.IsNullOrWhiteSpace(iconPath))
             {
-                float u1 = float.Parse(iconNode.Elements("attribute").First(a => a.Attribute("id")!.Value == "U1").Attribute("value")!.Value);
-                float u2 = float.Parse(iconNode.Elements("attribute").First(a => a.Attribute("id")!.Value == "U2").Attribute("value")!.Value);
-                float v1 = float.Parse(iconNode.Elements("attribute").First(a => a.Attribute("id")!.Value == "V1").Attribute("value")!.Value);
-                float v2 = float.Parse(iconNode.Elements("attribute").First(a => a.Attribute("id")!.Value == "V2").Attribute("value")!.Value);
+                float u1 = float.Parse(iconUv.Attributes[1].Value);
+                float u2 = float.Parse(iconUv.Attributes[2].Value);
+                float v1 = float.Parse(iconUv.Attributes[3].Value);
+                float v2 = float.Parse(iconUv.Attributes[4].Value);
 
                 float x = u1 * atlasWidth;
                 float y = v1 * atlasHeight;
@@ -44,7 +43,7 @@ public class TextureAtlasBuilder
 
                 if (icon.Width != width || icon.Height != height)
                 {
-                    icon.Mutate(ctx => ctx.Resize((int)width, (int)height));
+                    icon.Mutate(ctx => ctx.Resize((int)width, (int)height, KnownResamplers.Lanczos3));
                 }
 
                 ApplyAlphaAdjustment(icon);
