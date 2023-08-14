@@ -151,22 +151,32 @@ void BuildSingleDirectory(
             Build(filePath, destPath);
             Log($"Compiled {destPath}\n  Including source at {destFilePath}");
         }
-        else if (fileExt == ".xml" && filePath.Contains("Localization"))
-        {
-            File.Copy(filePath, destFilePath);
-            string destPath = Path.ChangeExtension(destFilePath, ".loca");
-            LocaResource.ReadFromXml(filePath).SaveTo(destPath);
-            Log($"Compiled localization table {fileName} -> {destPath}  Including source at {destFilePath}");
-        }
         else if (fileExt == ".png")
         {
             string destPath = Path.ChangeExtension(destFilePath, ".DDS");
             ConvertToDds(filePath, destPath, DdsType.Bc7);
             Log($"Converted {fileName} -> {destPath}");
         }
-        else if (fileExt == ".xml" || fileExt == ".txt")
+        else if (fileExt == ".xml")
         {
             File.Copy(filePath, destFilePath);
+            Log($"Included {destFilePath}");
+
+            if (filePath.Contains("Localization"))
+            {
+                string destPath = Path.ChangeExtension(destFilePath, ".loca");
+                LocaResource.ReadFromXml(filePath).SaveTo(destPath);
+                Log($"Compiled localization table {destPath}");
+            }
+        }
+        else if (fileExt == ".txt")
+        {
+            File.WriteAllLines(destFilePath, File.ReadAllLines(filePath).Where(line =>
+            {
+                string trimmedLine = line.TrimStart();
+                return !trimmedLine.StartsWith("//"); // strip any lines that start with a comment
+            }));
+
             Log($"Included {destFilePath}");
         }
         else
