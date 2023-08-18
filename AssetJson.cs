@@ -4,10 +4,11 @@ public enum AssetJsonType
 {
     TextureAtlas = 0,
     BuildVariant = 1,
+    Unknown = 255,
 }
 
 public record AssetJson(
-    AssetJsonType Type);
+    AssetJsonType Type = AssetJsonType.Unknown);
 
 public record TextureAtlasJson(
     AssetJsonType Type,

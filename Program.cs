@@ -141,7 +141,8 @@ void BuildSingleDirectory(
             }
             else
             {
-                Log($"Unknown asset type {asset.Type}", ConsoleColor.Red);
+                File.Copy(filePath, destFilePath);
+                Log($"Unrecognised JSON, including as it's probably part of ScriptExtender.", ConsoleColor.Yellow);
             }
         }
         else if (fileExt == ".lsx")
@@ -178,6 +179,11 @@ void BuildSingleDirectory(
             }));
 
             Log($"Included {destFilePath}");
+        }
+        else if (fileExt == ".gameScript" || fileExt == ".itemScript" || fileExt == ".lua")
+        {
+            File.Copy(filePath, destFilePath);
+            Log($"Included script {destFilePath}");
         }
         else
         {
